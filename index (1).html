@@ -1,0 +1,166 @@
+<!DOCTYPE html>    <html lang="zh-CN">    
+<head>    
+<meta charset="UTF-8" />    
+<meta name="viewport" content="width=device-width, initial-scale=1" />    
+<title>系统绘制网页指南针</title>    
+<style>    
+  body {    
+    font-family: sans-serif;    
+    text-align: center;    
+    padding: 40px;    
+    background: #f0f0f0;    
+  }    
+  canvas {    
+    background: white;    
+    border-radius: 50%;    
+    box-shadow: 0 0 10px rgba(0,0,0,0.2);    
+    display: block;    
+    margin: 0 auto;    
+  }    
+  #direction {    
+    margin-top: 20px;    
+    font-size: 1.3rem;    
+  }    
+  #error {    
+    color: red;    
+    margin-top: 10px;    
+  }    
+  button {    
+    margin-top: 30px;    
+    font-size: 1rem;    
+    padding: 10px 20px;    
+  }    
+</style>    
+</head>    
+<body>    <h1>系统绘制网页指南针</h1>    <canvas id="compass" width="300" height="300"></canvas>
+
+<div id="direction">等待方向数据...</div>    
+<div id="error"></div>    <script>    
+  const canvas = document.getElementById('compass');    
+  const ctx = canvas.getContext('2d');    
+  const width = canvas.width;    
+  const height = canvas.height;    
+  const centerX = width / 2;    
+  const centerY = height / 2;    
+  const radius = 140;    
+    
+  const directionText = document.getElementById('direction');    
+  const errorText = document.getElementById('error');    
+    
+  // 绘制刻度盘函数    
+  function drawDial(rotation) {    
+    ctx.clearRect(0, 0, width, height);    
+    
+    ctx.save();    
+    ctx.translate(centerX, centerY);    
+    ctx.rotate(rotation * Math.PI / 180);    
+    
+    // 外圆    
+    ctx.beginPath();    
+    ctx.lineWidth = 6;    
+    ctx.strokeStyle = '#444';    
+    ctx.arc(0, 0, radius, 0, 2 * Math.PI);    
+    ctx.stroke();    
+    
+    // 刻度    
+    for(let i=0; i<360; i+=5){    
+      ctx.beginPath();    
+      let len = (i % 45 === 0) ? 15 : 7;    
+      ctx.lineWidth = (i % 45 === 0) ? 3 : 1;    
+      ctx.strokeStyle = '#444';    
+      ctx.moveTo(0, -radius);    
+      ctx.lineTo(0, -radius + len);    
+      ctx.stroke();    
+      ctx.rotate(5 * Math.PI / 180);    
+    }    
+    
+    // 方向文字（8个主方向）    
+    const dirs = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];    
+    ctx.fillStyle = '#222';    
+    ctx.font = '20px sans-serif';    
+    ctx.textAlign = 'center';    
+    ctx.textBaseline = 'middle';    
+    for(let i=0; i<8; i++) {    
+      let angle = (i * 45) * Math.PI / 180;    
+      let x = Math.sin(angle) * (radius - 35);    
+      let y = -Math.cos(angle) * (radius - 35);    
+      ctx.fillText(dirs[i], x, y);    
+    }    
+    
+    ctx.restore();    
+    
+    // 绘制指针（固定指向正北，红色）    
+    ctx.beginPath();    
+    ctx.fillStyle = 'red';    
+    ctx.moveTo(centerX, centerY - radius + 20);    
+    ctx.lineTo(centerX - 8, centerY);    
+    ctx.lineTo(centerX + 8, centerY);    
+    ctx.closePath();    
+    ctx.fill();    
+    
+    // 指针中心小圆    
+    ctx.beginPath();    
+    ctx.fillStyle = '#222';    
+    ctx.arc(centerX, centerY, 10, 0, 2 * Math.PI);    
+    ctx.fill();    
+  }    
+    
+  // 方向转换    
+  function getDirection(angle) {    
+    angle = angle % 360;    
+    if (angle < 0) angle += 360;    
+    const directions = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];    
+    const index = Math.round(angle / 45) % 8;    
+    return directions[index];    
+  }    
+    
+  function handleOrientation(event) {    
+    let alpha;    
+    
+    if (event.webkitCompassHeading !== undefined) {    
+      alpha = event.webkitCompassHeading;    
+    } else if (event.alpha !== null) {    
+      alpha = 360 - event.alpha;    
+    } else {    
+      errorText.textContent = '无法获取方向数据';    
+      return;    
+    }    
+    
+    errorText.textContent = '';    
+    const direction = getDirection(alpha);    
+    directionText.textContent = `当前方向：${direction} (${Math.round(alpha)}°)`;    
+    
+    // 盘面旋转，针固定北    
+    drawDial(alpha);    
+  }    
+    
+  // 设备方向支持检测及权限请求（iOS）    
+  if (window.DeviceOrientationEvent) {    
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {    
+      const btn = document.createElement('button');    
+      btn.textContent = '点击启用指南针';    
+      btn.onclick = () => {    
+        DeviceOrientationEvent.requestPermission()    
+          .then(permission => {    
+            if (permission === 'granted') {    
+              window.addEventListener('deviceorientation', handleOrientation, true);    
+              btn.remove();    
+              errorText.textContent = '';    
+            } else {    
+              errorText.textContent = '权限被拒绝';    
+            }    
+          })    
+          .catch(() => errorText.textContent = '请求权限失败');    
+      };    
+      document.body.appendChild(btn);    
+    } else {    
+      window.addEventListener('deviceorientation', handleOrientation, true);    
+    }    
+  } else {    
+    errorText.textContent = '设备不支持方向传感器';    
+  }    
+    
+  // 初始绘制静态盘（北朝上）    
+  drawDial(0);    
+</script>    </body>    
+</html>
